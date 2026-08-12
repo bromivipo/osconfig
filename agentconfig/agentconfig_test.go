@@ -341,11 +341,6 @@ func TestSetConfigDefaultValues(t *testing.T) {
 			want: extendedInventoryEnabledDefault,
 		},
 		{
-			name: "extended inventory collection interval is requested, returns default duration",
-			op:   asAny(ExtendedInventoryCollectionInterval),
-			want: time.Duration(extendedInventoryCollectionIntervalDefault) * time.Minute,
-		},
-		{
 			name: "extended inventory extractors allowed is requested, returns default slice",
 			op:   asAny(ExtendedInventoryExtractorsAllowed),
 			want: []string(nil),
@@ -363,14 +358,12 @@ func TestSetExtendedInventory(t *testing.T) {
 		name           string
 		md             metadataJSON
 		wantEnabled    bool
-		wantInterval   time.Duration
 		wantExtractors []string
 	}{
 		{
 			name:           "project and instance values are empty, returns defaults",
 			md:             metadataJSON{},
 			wantEnabled:    false,
-			wantInterval:   10 * time.Minute,
 			wantExtractors: nil,
 		},
 		{
@@ -378,14 +371,12 @@ func TestSetExtendedInventory(t *testing.T) {
 			md: metadataJSON{
 				Project: projectJSON{
 					Attributes: attributesJSON{
-						ExtendedInventoryEnabled:            "true",
-						ExtendedInventoryCollectionInterval: jsonNumberPtr("15"),
-						ExtendedInventoryExtractorsAllowed:  "pkg, os",
+						ExtendedInventoryEnabled:           "true",
+						ExtendedInventoryExtractorsAllowed: "pkg, os",
 					},
 				},
 			},
 			wantEnabled:    true,
-			wantInterval:   15 * time.Minute,
 			wantExtractors: []string{"pkg", "os"},
 		},
 		{
@@ -393,21 +384,18 @@ func TestSetExtendedInventory(t *testing.T) {
 			md: metadataJSON{
 				Project: projectJSON{
 					Attributes: attributesJSON{
-						ExtendedInventoryEnabled:            "true",
-						ExtendedInventoryCollectionInterval: jsonNumberPtr("15"),
-						ExtendedInventoryExtractorsAllowed:  "pkg, os",
+						ExtendedInventoryEnabled:           "true",
+						ExtendedInventoryExtractorsAllowed: "pkg, os",
 					},
 				},
 				Instance: instanceJSON{
 					Attributes: attributesJSON{
-						ExtendedInventoryEnabled:            "false",
-						ExtendedInventoryCollectionInterval: jsonNumberPtr("30"),
-						ExtendedInventoryExtractorsAllowed:  "pkg",
+						ExtendedInventoryEnabled:           "false",
+						ExtendedInventoryExtractorsAllowed: "pkg",
 					},
 				},
 			},
 			wantEnabled:    false,
-			wantInterval:   30 * time.Minute,
 			wantExtractors: []string{"pkg"},
 		},
 	}
@@ -420,15 +408,9 @@ func TestSetExtendedInventory(t *testing.T) {
 			agentConfigMx.Unlock()
 
 			utiltest.AssertEquals(t, ExtendedInventoryEnabled(), tt.wantEnabled)
-			utiltest.AssertEquals(t, ExtendedInventoryCollectionInterval(), tt.wantInterval)
 			utiltest.AssertEquals(t, ExtendedInventoryExtractorsAllowed(), tt.wantExtractors)
 		})
 	}
-}
-
-func jsonNumberPtr(s string) *json.Number {
-	n := json.Number(s)
-	return &n
 }
 
 // TestWatchConfigUnchangedConfigTimeout ignores unchanged metadata until timeout.
@@ -880,19 +862,18 @@ func TestCreateConfigFromMetadata(t *testing.T) {
 			name: "metadata is empty, returns config defaults",
 			md:   metadataJSON{},
 			want: &config{
-				osInventoryEnabled:                  osInventoryEnabledDefault,
-				guestPoliciesEnabled:                guestPoliciesEnabledDefault,
-				taskNotificationEnabled:             taskNotificationEnabledDefault,
-				debugEnabled:                        debugEnabledDefault,
-				extendedInventoryEnabled:            extendedInventoryEnabledDefault,
-				extendedInventoryCollectionInterval: extendedInventoryCollectionIntervalDefault,
-				svcEndpoint:                         strings.ReplaceAll(prodEndpoint, "{zone}", ""),
-				osConfigPollInterval:                osConfigPollIntervalDefault,
-				googetRepoFilePath:                  googetRepoFilePath,
-				zypperRepoFilePath:                  zypperRepoFilePath,
-				yumRepoFilePath:                     yumRepoFilePath,
-				aptRepoFilePath:                     aptRepoFilePath,
-				universeDomain:                      universeDomainDefault,
+				osInventoryEnabled:       osInventoryEnabledDefault,
+				guestPoliciesEnabled:     guestPoliciesEnabledDefault,
+				taskNotificationEnabled:  taskNotificationEnabledDefault,
+				debugEnabled:             debugEnabledDefault,
+				extendedInventoryEnabled: extendedInventoryEnabledDefault,
+				svcEndpoint:              strings.ReplaceAll(prodEndpoint, "{zone}", ""),
+				osConfigPollInterval:     osConfigPollIntervalDefault,
+				googetRepoFilePath:       googetRepoFilePath,
+				zypperRepoFilePath:       zypperRepoFilePath,
+				yumRepoFilePath:          yumRepoFilePath,
+				aptRepoFilePath:          aptRepoFilePath,
+				universeDomain:           universeDomainDefault,
 			},
 		},
 		{
@@ -908,20 +889,19 @@ func TestCreateConfigFromMetadata(t *testing.T) {
 				},
 			},
 			want: &config{
-				projectID:                           "proj-1",
-				osInventoryEnabled:                  true,
-				guestPoliciesEnabled:                true,
-				taskNotificationEnabled:             true,
-				debugEnabled:                        true,
-				extendedInventoryEnabled:            extendedInventoryEnabledDefault,
-				extendedInventoryCollectionInterval: extendedInventoryCollectionIntervalDefault,
-				svcEndpoint:                         strings.ReplaceAll(prodEndpoint, "{zone}", ""),
-				osConfigPollInterval:                15,
-				googetRepoFilePath:                  googetRepoFilePath,
-				zypperRepoFilePath:                  zypperRepoFilePath,
-				yumRepoFilePath:                     yumRepoFilePath,
-				aptRepoFilePath:                     aptRepoFilePath,
-				universeDomain:                      universeDomainDefault,
+				projectID:                "proj-1",
+				osInventoryEnabled:       true,
+				guestPoliciesEnabled:     true,
+				taskNotificationEnabled:  true,
+				debugEnabled:             true,
+				extendedInventoryEnabled: extendedInventoryEnabledDefault,
+				svcEndpoint:              strings.ReplaceAll(prodEndpoint, "{zone}", ""),
+				osConfigPollInterval:     15,
+				googetRepoFilePath:       googetRepoFilePath,
+				zypperRepoFilePath:       zypperRepoFilePath,
+				yumRepoFilePath:          yumRepoFilePath,
+				aptRepoFilePath:          aptRepoFilePath,
+				universeDomain:           universeDomainDefault,
 			},
 		},
 		{
@@ -944,20 +924,19 @@ func TestCreateConfigFromMetadata(t *testing.T) {
 				},
 			},
 			want: &config{
-				projectID:                           "proj-1",
-				osInventoryEnabled:                  false,
-				guestPoliciesEnabled:                false,
-				taskNotificationEnabled:             false,
-				debugEnabled:                        true,
-				extendedInventoryEnabled:            extendedInventoryEnabledDefault,
-				extendedInventoryCollectionInterval: extendedInventoryCollectionIntervalDefault,
-				svcEndpoint:                         strings.ReplaceAll(prodEndpoint, "{zone}", ""),
-				osConfigPollInterval:                20,
-				googetRepoFilePath:                  googetRepoFilePath,
-				zypperRepoFilePath:                  zypperRepoFilePath,
-				yumRepoFilePath:                     yumRepoFilePath,
-				aptRepoFilePath:                     aptRepoFilePath,
-				universeDomain:                      universeDomainDefault,
+				projectID:                "proj-1",
+				osInventoryEnabled:       false,
+				guestPoliciesEnabled:     false,
+				taskNotificationEnabled:  false,
+				debugEnabled:             true,
+				extendedInventoryEnabled: extendedInventoryEnabledDefault,
+				svcEndpoint:              strings.ReplaceAll(prodEndpoint, "{zone}", ""),
+				osConfigPollInterval:     20,
+				googetRepoFilePath:       googetRepoFilePath,
+				zypperRepoFilePath:       zypperRepoFilePath,
+				yumRepoFilePath:          yumRepoFilePath,
+				aptRepoFilePath:          aptRepoFilePath,
+				universeDomain:           universeDomainDefault,
 			},
 		},
 		{
@@ -977,20 +956,19 @@ func TestCreateConfigFromMetadata(t *testing.T) {
 				},
 			},
 			want: &config{
-				instanceID:                          "98765",
-				osInventoryEnabled:                  false,
-				guestPoliciesEnabled:                false,
-				taskNotificationEnabled:             true,
-				debugEnabled:                        debugEnabledDefault,
-				extendedInventoryEnabled:            extendedInventoryEnabledDefault,
-				extendedInventoryCollectionInterval: extendedInventoryCollectionIntervalDefault,
-				svcEndpoint:                         strings.ReplaceAll(prodEndpoint, "{zone}", ""),
-				osConfigPollInterval:                15,
-				googetRepoFilePath:                  googetRepoFilePath,
-				zypperRepoFilePath:                  zypperRepoFilePath,
-				yumRepoFilePath:                     yumRepoFilePath,
-				aptRepoFilePath:                     aptRepoFilePath,
-				universeDomain:                      universeDomainDefault,
+				instanceID:               "98765",
+				osInventoryEnabled:       false,
+				guestPoliciesEnabled:     false,
+				taskNotificationEnabled:  true,
+				debugEnabled:             debugEnabledDefault,
+				extendedInventoryEnabled: extendedInventoryEnabledDefault,
+				svcEndpoint:              strings.ReplaceAll(prodEndpoint, "{zone}", ""),
+				osConfigPollInterval:     15,
+				googetRepoFilePath:       googetRepoFilePath,
+				zypperRepoFilePath:       zypperRepoFilePath,
+				yumRepoFilePath:          yumRepoFilePath,
+				aptRepoFilePath:          aptRepoFilePath,
+				universeDomain:           universeDomainDefault,
 			},
 		},
 		{
@@ -1004,19 +982,18 @@ func TestCreateConfigFromMetadata(t *testing.T) {
 			},
 			setDebugFlag: true,
 			want: &config{
-				osInventoryEnabled:                  osInventoryEnabledDefault,
-				guestPoliciesEnabled:                guestPoliciesEnabledDefault,
-				taskNotificationEnabled:             taskNotificationEnabledDefault,
-				debugEnabled:                        true,
-				extendedInventoryEnabled:            extendedInventoryEnabledDefault,
-				extendedInventoryCollectionInterval: extendedInventoryCollectionIntervalDefault,
-				svcEndpoint:                         strings.ReplaceAll(prodEndpoint, "{zone}", ""),
-				osConfigPollInterval:                osConfigPollIntervalDefault,
-				googetRepoFilePath:                  googetRepoFilePath,
-				zypperRepoFilePath:                  zypperRepoFilePath,
-				yumRepoFilePath:                     yumRepoFilePath,
-				aptRepoFilePath:                     aptRepoFilePath,
-				universeDomain:                      universeDomainDefault,
+				osInventoryEnabled:       osInventoryEnabledDefault,
+				guestPoliciesEnabled:     guestPoliciesEnabledDefault,
+				taskNotificationEnabled:  taskNotificationEnabledDefault,
+				debugEnabled:             true,
+				extendedInventoryEnabled: extendedInventoryEnabledDefault,
+				svcEndpoint:              strings.ReplaceAll(prodEndpoint, "{zone}", ""),
+				osConfigPollInterval:     osConfigPollIntervalDefault,
+				googetRepoFilePath:       googetRepoFilePath,
+				zypperRepoFilePath:       zypperRepoFilePath,
+				yumRepoFilePath:          yumRepoFilePath,
+				aptRepoFilePath:          aptRepoFilePath,
+				universeDomain:           universeDomainDefault,
 			},
 		},
 	}

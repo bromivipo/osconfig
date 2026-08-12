@@ -62,12 +62,11 @@ const (
 
 	prodEndpoint = "{zone}-osconfig.googleapis.com.:443"
 
-	osInventoryEnabledDefault                  = false
-	guestPoliciesEnabledDefault                = false
-	taskNotificationEnabledDefault             = false
-	debugEnabledDefault                        = false
-	extendedInventoryEnabledDefault            = false
-	extendedInventoryCollectionIntervalDefault = 10
+	osInventoryEnabledDefault       = false
+	guestPoliciesEnabledDefault     = false
+	taskNotificationEnabledDefault  = false
+	debugEnabledDefault             = false
+	extendedInventoryEnabledDefault = false
 
 	oldConfigDirLinux = "/etc/osconfig"
 	cacheDirLinux     = "/var/lib/google_osconfig_agent"
@@ -124,28 +123,27 @@ var (
 )
 
 type config struct {
-	aptRepoFilePath                     string
-	instanceName                        string
-	instanceZone                        string
-	projectID                           string
-	svcEndpoint                         string
-	googetRepoFilePath                  string
-	zypperRepoFilePath                  string
-	yumRepoFilePath                     string
-	instanceID                          string
-	universeDomain                      string
-	numericProjectID                    int64
-	osConfigPollInterval                int
-	debugEnabled                        bool
-	taskNotificationEnabled             bool
-	guestPoliciesEnabled                bool
-	osInventoryEnabled                  bool
-	scalibrLinuxEnabled                 bool
-	guestAttributesEnabled              bool
-	traceGetInventory                   bool
-	extendedInventoryEnabled            bool
-	extendedInventoryCollectionInterval int
-	extendedInventoryExtractorsAllowed  []string
+	aptRepoFilePath                    string
+	instanceName                       string
+	instanceZone                       string
+	projectID                          string
+	svcEndpoint                        string
+	googetRepoFilePath                 string
+	zypperRepoFilePath                 string
+	yumRepoFilePath                    string
+	instanceID                         string
+	universeDomain                     string
+	numericProjectID                   int64
+	osConfigPollInterval               int
+	debugEnabled                       bool
+	taskNotificationEnabled            bool
+	guestPoliciesEnabled               bool
+	osInventoryEnabled                 bool
+	scalibrLinuxEnabled                bool
+	guestAttributesEnabled             bool
+	traceGetInventory                  bool
+	extendedInventoryEnabled           bool
+	extendedInventoryExtractorsAllowed []string
 }
 
 func (c *config) parseFeatures(features string, enabled bool) {
@@ -236,37 +234,35 @@ type universeJSON struct {
 }
 
 type attributesJSON struct {
-	PollIntervalOld                     *json.Number `json:"os-config-poll-interval"`
-	PollInterval                        *json.Number `json:"osconfig-poll-interval"`
-	InventoryEnabledOld                 string       `json:"os-inventory-enabled"`
-	InventoryEnabled                    string       `json:"enable-os-inventory"`
-	PreReleaseFeaturesOld               string       `json:"os-config-enabled-prerelease-features"`
-	PreReleaseFeatures                  string       `json:"osconfig-enabled-prerelease-features"`
-	DebugEnabledOld                     string       `json:"enable-os-config-debug"`
-	LogLevel                            string       `json:"osconfig-log-level"`
-	OSConfigEndpointOld                 string       `json:"os-config-endpoint"`
-	OSConfigEndpoint                    string       `json:"osconfig-endpoint"`
-	OSConfigEnabled                     string       `json:"enable-osconfig"`
-	DisabledFeatures                    string       `json:"osconfig-disabled-features"`
-	EnableGuestAttributes               string       `json:"enable-guest-attributes"`
-	TraceGetInventory                   string       `json:"trace-get-inventory"`
-	ScalibrLinuxEnabled                 string       `json:"enable-scalibr-linux"`
-	ExtendedInventoryEnabled            string       `json:"osconfig-extended-inventory-enabled"`
-	ExtendedInventoryCollectionInterval *json.Number `json:"osconfig-extended-inventory-collection-interval"`
-	ExtendedInventoryExtractorsAllowed  string       `json:"osconfig-extended-inventory-extractors-allowed"`
+	PollIntervalOld                    *json.Number `json:"os-config-poll-interval"`
+	PollInterval                       *json.Number `json:"osconfig-poll-interval"`
+	InventoryEnabledOld                string       `json:"os-inventory-enabled"`
+	InventoryEnabled                   string       `json:"enable-os-inventory"`
+	PreReleaseFeaturesOld              string       `json:"os-config-enabled-prerelease-features"`
+	PreReleaseFeatures                 string       `json:"osconfig-enabled-prerelease-features"`
+	DebugEnabledOld                    string       `json:"enable-os-config-debug"`
+	LogLevel                           string       `json:"osconfig-log-level"`
+	OSConfigEndpointOld                string       `json:"os-config-endpoint"`
+	OSConfigEndpoint                   string       `json:"osconfig-endpoint"`
+	OSConfigEnabled                    string       `json:"enable-osconfig"`
+	DisabledFeatures                   string       `json:"osconfig-disabled-features"`
+	EnableGuestAttributes              string       `json:"enable-guest-attributes"`
+	TraceGetInventory                  string       `json:"trace-get-inventory"`
+	ScalibrLinuxEnabled                string       `json:"enable-scalibr-linux"`
+	ExtendedInventoryEnabled           string       `json:"osconfig-extended-inventory-enabled"`
+	ExtendedInventoryExtractorsAllowed string       `json:"osconfig-extended-inventory-extractors-allowed"`
 }
 
 func createConfigFromMetadata(md metadataJSON) *config {
 	old := getAgentConfig()
 	c := &config{
-		osInventoryEnabled:                  osInventoryEnabledDefault,
-		guestPoliciesEnabled:                guestPoliciesEnabledDefault,
-		taskNotificationEnabled:             taskNotificationEnabledDefault,
-		debugEnabled:                        debugEnabledDefault,
-		svcEndpoint:                         prodEndpoint,
-		osConfigPollInterval:                osConfigPollIntervalDefault,
-		extendedInventoryEnabled:            extendedInventoryEnabledDefault,
-		extendedInventoryCollectionInterval: extendedInventoryCollectionIntervalDefault,
+		osInventoryEnabled:       osInventoryEnabledDefault,
+		guestPoliciesEnabled:     guestPoliciesEnabledDefault,
+		taskNotificationEnabled:  taskNotificationEnabledDefault,
+		debugEnabled:             debugEnabledDefault,
+		svcEndpoint:              prodEndpoint,
+		osConfigPollInterval:     osConfigPollIntervalDefault,
+		extendedInventoryEnabled: extendedInventoryEnabledDefault,
 
 		googetRepoFilePath: googetRepoFilePath,
 		zypperRepoFilePath: zypperRepoFilePath,
@@ -409,17 +405,6 @@ func setExtendedInventory(md metadataJSON, c *config) {
 	}
 	if instanceSettings.ExtendedInventoryEnabled != "" {
 		c.extendedInventoryEnabled = parseBool(instanceSettings.ExtendedInventoryEnabled)
-	}
-
-	if projectSettings.ExtendedInventoryCollectionInterval != nil {
-		if val, err := projectSettings.ExtendedInventoryCollectionInterval.Int64(); err == nil {
-			c.extendedInventoryCollectionInterval = int(val)
-		}
-	}
-	if instanceSettings.ExtendedInventoryCollectionInterval != nil {
-		if val, err := instanceSettings.ExtendedInventoryCollectionInterval.Int64(); err == nil {
-			c.extendedInventoryCollectionInterval = int(val)
-		}
 	}
 
 	if projectSettings.ExtendedInventoryExtractorsAllowed != "" {
@@ -656,11 +641,6 @@ func TraceGetInventory() bool {
 // ExtendedInventoryEnabled indicates whether extended inventory collection should be enabled.
 func ExtendedInventoryEnabled() bool {
 	return getAgentConfig().extendedInventoryEnabled
-}
-
-// ExtendedInventoryCollectionInterval returns the frequency for extended inventory collection.
-func ExtendedInventoryCollectionInterval() time.Duration {
-	return time.Duration(getAgentConfig().extendedInventoryCollectionInterval) * time.Minute
 }
 
 // ExtendedInventoryExtractorsAllowed returns the allowed extractors for extended inventory.
