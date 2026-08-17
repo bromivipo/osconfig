@@ -183,12 +183,17 @@ func enrichWindowsApplicationWithPurl(pkgs []*WindowsApplication) []*WindowsAppl
 	return pkgs
 }
 
-// NewInstalledPackagesProvider makes provider that uses osv-scalibr as its implementation if enabled by config, otherwise falls back to default legacy implementation.
+// NewInstalledPackagesProvider makes provider that uses osv-scalibr as its implementation merged with default legacy implementation if enabled by config, otherwise falls back to default legacy implementation.
 func NewInstalledPackagesProvider(osinfoProvider osinfo.Provider) InstalledPackagesProvider {
 	if agentconfig.ExtendedInventoryEnabled() {
-		return scalibrInstalledPackagesProvider{
-			extractors:     agentconfig.ExtendedInventoryExtractorsAllowed(),
-			osinfoProvider: osinfoProvider,
+		return mergedInstalledPackagesProvider{
+			scalibrProvider: scalibrInstalledPackagesProvider{
+				extractors:     agentconfig.ExtendedInventoryExtractorsAllowed(),
+				osinfoProvider: osinfoProvider,
+			},
+			defaultProvider: defaultInstalledPackagesProvider{
+				osinfoProvider: osinfoProvider,
+			},
 		}
 	}
 

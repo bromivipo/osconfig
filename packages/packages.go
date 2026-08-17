@@ -18,6 +18,7 @@ package packages
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os/exec"
 	"sort"
@@ -95,6 +96,31 @@ func (p defaultInstalledPackagesProvider) GetInstalledPackages(ctx context.Conte
 	return p.getInstalledPackages(ctx)
 }
 
+type mergedInstalledPackagesProvider struct {
+	scalibrProvider InstalledPackagesProvider
+	defaultProvider InstalledPackagesProvider
+}
+
+func (p mergedInstalledPackagesProvider) GetInstalledPackages(ctx context.Context) (Packages, error) {
+	scalibrPkgs, scalibrErr := p.scalibrProvider.GetInstalledPackages(ctx)
+	defaultPkgs, defaultErr := p.defaultProvider.GetInstalledPackages(ctx)
+
+	var errs []string
+	if scalibrErr != nil {
+		errs = append(errs, fmt.Sprintf("scalibr error: %v", scalibrErr))
+	}
+	if defaultErr != nil {
+		errs = append(errs, fmt.Sprintf("default error: %v", defaultErr))
+	}
+
+	var err error
+	if len(errs) != 0 {
+		err = errors.New(strings.Join(errs, "\n"))
+	}
+
+	return scalibrPkgs.Merge(defaultPkgs), err
+}
+
 // Packages is a selection of packages based on their manager.
 type Packages struct {
 	Yum                []*PkgInfo            `json:"yum,omitempty"`
@@ -112,6 +138,46 @@ type Packages struct {
 	WindowsApplication []*WindowsApplication `json:"-"`
 	Chocolatey         []*PkgInfo            `json:"chocolatey,omitempty"`
 	WinGet             []*PkgInfo            `json:"winget,omitempty"`
+}
+
+// Merge combines two Packages structs into one, removing duplicate packages.
+func (p Packages) Merge(other Packages) Packages {
+	return Packages{
+		Yum:                deduplicate(append(p.Yum, other.Yum...)),
+		Rpm:                deduplicate(append(p.Rpm, other.Rpm...)),
+		Apt:                deduplicate(append(p.Apt, other.Apt...)),
+		Deb:                deduplicate(append(p.Deb, other.Deb...)),
+		Zypper:             deduplicate(append(p.Zypper, other.Zypper...)),
+		ZypperPatches:      deduplicate(append(p.ZypperPatches, other.ZypperPatches...)),
+		COS:                deduplicate(append(p.COS, other.COS...)),
+		Gem:                deduplicate(append(p.Gem, other.Gem...)),
+		Pip:                deduplicate(append(p.Pip, other.Pip...)),
+		GooGet:             deduplicate(append(p.GooGet, other.GooGet...)),
+		WUA:                deduplicate(append(p.WUA, other.WUA...)),
+		QFE:                deduplicate(append(p.QFE, other.QFE...)),
+		WindowsApplication: deduplicate(append(p.WindowsApplication, other.WindowsApplication...)),
+		Chocolatey:         deduplicate(append(p.Chocolatey, other.Chocolatey...)),
+		WinGet:             deduplicate(append(p.WinGet, other.WinGet...)),
+	}
+}
+
+func deduplicate[T any](items []T) []T {
+	if len(items) == 0 {
+		return nil
+	}
+	seen := make(map[string]struct{}, len(items))
+	var result []T
+	for _, item := range items {
+		if any(item) == nil {
+			continue
+		}
+		key := fmt.Sprintf("%+v", item)
+		if _, ok := seen[key]; !ok {
+			seen[key] = struct{}{}
+			result = append(result, item)
+		}
+	}
+	return result
 }
 
 // PkgInfo describes a package.
