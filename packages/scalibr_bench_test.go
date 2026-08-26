@@ -121,7 +121,7 @@ func runSingleBenchmark(ctx context.Context, osinfoProvider osinfo.Provider, ext
 		return benchResult{}, fmt.Errorf("GetInstalledPackages error: %w", err)
 	}
 
-	pkgsCount := len(pkgs.Chocolatey) + len(pkgs.WinGet) + len(pkgs.GooGet)
+	pkgsCount := len(pkgs.Chocolatey) + len(pkgs.WinGet) + len(pkgs.Deb) + len(pkgs.Rpm) + len(pkgs.COS)
 	allocMB := float64(memAfter.TotalAlloc-memBefore.TotalAlloc) / 1024 / 1024
 
 	return benchResult{
@@ -162,10 +162,9 @@ func TestScalibrBenchmark(t *testing.T) {
 		name       string
 		extractors []string
 	}{
-		{name: "All os extractors", extractors: []string{"os/chocolatey", "os/winget", "os/googet"}},
+		{name: "All os extractors", extractors: []string{"os/chocolatey", "os/winget"}},
 		{name: "os/chocolatey", extractors: []string{"os/chocolatey"}},
 		{name: "os/winget", extractors: []string{"os/winget"}},
-		{name: "os/googet", extractors: []string{"os/googet"}},
 	}
 
 	ctx := context.Background()
