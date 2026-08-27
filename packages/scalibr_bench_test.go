@@ -19,7 +19,10 @@ package packages
 import (
 	"context"
 	"fmt"
+	"math"
 	"runtime"
+	"sort"
+	"strings"
 	"testing"
 	"time"
 
@@ -134,8 +137,27 @@ func runSingleBenchmark(ctx context.Context, osinfoProvider osinfo.Provider, ext
 	}, nil
 }
 
+// calcP95 computes the 95th percentile duration from a slice of durations.
+func calcP95(durations []time.Duration) time.Duration {
+	if len(durations) == 0 {
+		return 0
+	}
+	sorted := make([]time.Duration, len(durations))
+	copy(sorted, durations)
+	sort.Slice(sorted, func(i, j int) bool { return sorted[i] < sorted[j] })
+
+	idx := int(math.Ceil(0.95*float64(len(sorted)))) - 1
+	if idx < 0 {
+		idx = 0
+	}
+	if idx >= len(sorted) {
+		idx = len(sorted) - 1
+	}
+	return sorted[idx]
+}
+
 // logBenchResult calculates averages over runs and outputs the formatted benchmark table row.
-func logBenchResult(t *testing.T, name string, res benchResult, runs int) {
+func logBenchResult(t *testing.T, name string, res benchResult, p95Duration time.Duration, runs int) {
 	if runs <= 0 {
 		return
 	}
@@ -146,9 +168,10 @@ func logBenchResult(t *testing.T, name string, res benchResult, runs int) {
 	avgPeakCPU := res.cpuPeak / r
 	avgMeanCPU := res.cpuMean / r
 
-	t.Logf("| `%s` | %v | %.2f MB | %.2f MB | %.1f%% | %.1f%% | %d |",
+	t.Logf("| `%s` | %v | %v | %.2f MB | %.2f MB | %.1f%% | %.1f%% | %d |",
 		name,
 		avgDuration,
+		p95Duration,
 		avgAllocMB,
 		avgPeakRAM,
 		avgPeakCPU,
@@ -173,17 +196,19 @@ func TestScalibrBenchmark(t *testing.T) {
 	t.Log("\n=========================================================================")
 	t.Log("### SCALIBR Extractors Benchmark Results")
 	t.Log("=========================================================================")
-	t.Log("| Scenario | Avg Scan Time | Avg Heap Alloc | Peak RAM RSS | Peak CPU % | Mean CPU % | Pkgs Found |")
-	t.Log("| --- | --- | --- | --- | --- | --- | --- |")
+	t.Log("| Scenario | Avg Scan Time | p95 Scan Time | Avg Heap Alloc | Peak RAM RSS | Peak CPU % | Mean CPU % | Pkgs Found |")
+	t.Log("| --- | --- | --- | --- | --- | --- | --- | --- |")
 
 	runs := 3
 	for _, bm := range benchmarks {
 		var total benchResult
+		var durations []time.Duration
 		for i := 0; i < runs; i++ {
 			res, err := runSingleBenchmark(ctx, osinfoProvider, bm.extractors)
 			if err != nil {
 				t.Fatalf("Benchmark scenario %s failed: %v", bm.name, err)
 			}
+			durations = append(durations, res.duration)
 			total.duration += res.duration
 			total.allocMB += res.allocMB
 			total.memPeakMB += res.memPeakMB
@@ -192,6 +217,73 @@ func TestScalibrBenchmark(t *testing.T) {
 			total.pkgsCount = res.pkgsCount
 		}
 
-		logBenchResult(t, bm.name, total, runs)
+		p95 := calcP95(durations)
+		logBenchResult(t, bm.name, total, p95, runs)
 	}
+}
+
+func TestCompareWinGetScalibrAndLegacy(t *testing.T) {
+	ctx := context.Background()
+	osinfoProvider := osinfo.NewProvider()
+
+	t.Log("Collecting WinGet packages via SCALIBR...")
+	scalibrProvider := &scalibrInstalledPackagesProvider{
+		extractors:     []string{"os/winget"},
+		osinfoProvider: osinfoProvider,
+	}
+	scalibrPkgs, err := scalibrProvider.GetInstalledPackages(ctx)
+	if err != nil {
+		t.Fatalf("SCALIBR GetInstalledPackages failed: %v", err)
+	}
+
+	t.Log("Collecting Windows applications via Legacy flow (Registry)...")
+	legacyProvider := &defaultInstalledPackagesProvider{
+		osinfoProvider: osinfoProvider,
+	}
+	legacyPkgs, err := legacyProvider.GetInstalledPackages(ctx)
+	if err != nil {
+		t.Logf("Legacy GetInstalledPackages returned warnings/errors: %v", err)
+	}
+
+	t.Log("\n=========================================================================")
+	t.Log("### WinGet (SCALIBR) vs Legacy Windows Applications Comparison")
+	t.Log("=========================================================================")
+	t.Logf("| Flow | Total Packages Found |")
+	t.Log("| --- | --- |")
+	t.Logf("| SCALIBR (`os/winget`) | %d |", len(scalibrPkgs.WinGet))
+	t.Logf("| Legacy (`WindowsApplication`) | %d |", len(legacyPkgs.WindowsApplication))
+
+	t.Log("\n--- SCALIBR WinGet Packages ---")
+	for i, pkg := range scalibrPkgs.WinGet {
+		t.Logf("  [%d] Name: %s | Version: %s | PURL: %s", i+1, pkg.Name, pkg.Version, pkg.Purl)
+	}
+
+	t.Log("\n--- Legacy Windows Applications (First 20) ---")
+	for i, app := range legacyPkgs.WindowsApplication {
+		if i >= 20 {
+			t.Logf("  ... and %d more legacy applications", len(legacyPkgs.WindowsApplication)-20)
+			break
+		}
+		t.Logf("  [%d] DisplayName: %s | DisplayVersion: %s | Publisher: %s", i+1, app.DisplayName, app.DisplayVersion, app.Publisher)
+	}
+
+	t.Log("\n--- Cross-Match Analysis ---")
+	matchedCount := 0
+	for _, wingetPkg := range scalibrPkgs.WinGet {
+		foundInLegacy := false
+		for _, app := range legacyPkgs.WindowsApplication {
+			if strings.EqualFold(wingetPkg.Name, app.DisplayName) ||
+				strings.Contains(strings.ToLower(app.DisplayName), strings.ToLower(wingetPkg.Name)) ||
+				strings.Contains(strings.ToLower(wingetPkg.Name), strings.ToLower(app.DisplayName)) {
+				t.Logf("  [MATCH] SCALIBR: '%s' (%s) <===> Legacy: '%s' (%s)", wingetPkg.Name, wingetPkg.Version, app.DisplayName, app.DisplayVersion)
+				foundInLegacy = true
+				matchedCount++
+				break
+			}
+		}
+		if !foundInLegacy {
+			t.Logf("  [SCALIBR ONLY] '%s' (%s) - no matching DisplayName in Registry", wingetPkg.Name, wingetPkg.Version)
+		}
+	}
+	t.Logf("\nSummary: %d of %d SCALIBR WinGet packages matched in Legacy Registry inventory.", matchedCount, len(scalibrPkgs.WinGet))
 }
