@@ -107,6 +107,8 @@ func pkgInfosFromExtractorPackages(ctx context.Context, scan *scalibr.ScanResult
 			packages.WinGet = append(packages.WinGet, pkgInfoFromGenericExtractorPackage(pkg, purl.TypeWinget))
 		} else if pkg.PURLType == purl.TypeGooget || (pkg.PURL() != nil && pkg.PURL().Type == purl.TypeGooget) {
 			packages.GooGet = append(packages.GooGet, pkgInfoFromGenericExtractorPackage(pkg, purl.TypeGooget))
+		} else if pkg.PURLType == purl.TypeGolang || (pkg.PURL() != nil && pkg.PURL().Type == purl.TypeGolang) {
+			packages.Go = append(packages.Go, pkgInfoFromGenericExtractorPackage(pkg, purl.TypeGolang))
 		} else {
 			clog.Errorf(ctx, "Package type not implemented: %v", pkg)
 		}

@@ -131,6 +131,19 @@ func TestExtractedPackageMappings(t *testing.T) {
 			}},
 		},
 		{
+			name: "go extractor maps correctly",
+			pkgs: []*extractor.Package{
+				{
+					Name:     "github.com/google/osv-scalibr",
+					Version:  "0.1.0",
+					PURLType: "golang",
+				},
+			},
+			want: Packages{Go: []*PkgInfo{
+				{Name: "github.com/google/osv-scalibr", Version: "0.1.0", Type: "golang", Purl: "pkg:golang/github.com/google/osv-scalibr@0.1.0"},
+			}},
+		},
+		{
 			name: "unknown package metadata type is ignored",
 			pkgs: []*extractor.Package{
 				{

@@ -112,6 +112,7 @@ type Packages struct {
 	WindowsApplication []*WindowsApplication `json:"-"`
 	Chocolatey         []*PkgInfo            `json:"chocolatey,omitempty"`
 	WinGet             []*PkgInfo            `json:"winget,omitempty"`
+	Go                 []*PkgInfo            `json:"go,omitempty"`
 }
 
 // PkgInfo describes a package.
@@ -128,6 +129,7 @@ const (
 	typeGooGet = "googet"
 	typeGem    = "gem"
 	typePypi   = "pypi"
+	typeGolang = "golang"
 )
 
 // Source represents source package from which binary package was built.

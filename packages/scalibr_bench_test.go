@@ -18,8 +18,10 @@ package packages
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"math"
+	"os"
 	"runtime"
 	"sort"
 	"strings"
@@ -28,6 +30,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/osconfig/osinfo"
 	"github.com/GoogleCloudPlatform/osconfig/util/utiltrace"
+	scalibr "github.com/google/osv-scalibr"
 )
 
 type cpuSample struct {
@@ -124,7 +127,7 @@ func runSingleBenchmark(ctx context.Context, osinfoProvider osinfo.Provider, ext
 		return benchResult{}, fmt.Errorf("GetInstalledPackages error: %w", err)
 	}
 
-	pkgsCount := len(pkgs.Chocolatey) + len(pkgs.WinGet) + len(pkgs.Deb) + len(pkgs.Rpm) + len(pkgs.COS)
+	pkgsCount := len(pkgs.Chocolatey) + len(pkgs.WinGet) + len(pkgs.Deb) + len(pkgs.Rpm) + len(pkgs.COS) + len(pkgs.Go)
 	allocMB := float64(memAfter.TotalAlloc-memBefore.TotalAlloc) / 1024 / 1024
 
 	return benchResult{
@@ -185,9 +188,11 @@ func TestScalibrBenchmark(t *testing.T) {
 		name       string
 		extractors []string
 	}{
-		{name: "All os extractors", extractors: []string{"os/chocolatey", "os/winget"}},
-		{name: "os/chocolatey", extractors: []string{"os/chocolatey"}},
-		{name: "os/winget", extractors: []string{"os/winget"}},
+		// {name: "All os extractors", extractors: []string{"os/chocolatey", "os/winget"}},
+		// {name: "os/chocolatey", extractors: []string{"os/chocolatey"}},
+		// {name: "os/winget", extractors: []string{"os/winget"}},
+		{name: "go/gomod", extractors: []string{"go/gomod"}},
+		{name: "go/binary", extractors: []string{"go/binary"}},
 	}
 
 	ctx := context.Background()
@@ -286,4 +291,134 @@ func TestCompareWinGetScalibrAndLegacy(t *testing.T) {
 		}
 	}
 	t.Logf("\nSummary: %d of %d SCALIBR WinGet packages matched in Legacy Registry inventory.", matchedCount, len(scalibrPkgs.WinGet))
+}
+
+func TestInspectPackageMetadata(t *testing.T) {
+	ctx := context.Background()
+	osinfoProvider := osinfo.NewProvider()
+
+	var extractors []string
+	if runtime.GOOS == "windows" {
+		extractors = []string{"os/chocolatey", "os/winget"}
+	} else {
+		extractors = []string{"os/dpkg", "os/rpm", "os/cos"}
+	}
+
+	provider := &scalibrInstalledPackagesProvider{
+		extractors:     extractors,
+		osinfoProvider: osinfoProvider,
+	}
+
+	scanConfig, err := provider.getScanConfig()
+	if err != nil {
+		t.Fatalf("getScanConfig failed: %v", err)
+	}
+
+	scan := scalibr.New().Scan(ctx, scanConfig)
+
+	outputFile := "scalibr_inspection.txt"
+	f, err := os.Create(outputFile)
+	if err != nil {
+		t.Fatalf("Failed to create %s: %v", outputFile, err)
+	}
+	defer f.Close()
+
+	var sb strings.Builder
+	writeLine := func(format string, args ...any) {
+		line := fmt.Sprintf(format, args...)
+		t.Log(line)
+		sb.WriteString(line + "\n")
+	}
+
+	writeLine("=========================================================================")
+	writeLine("### SCALIBR Raw Metadata vs Constructed OSConfig Package (%d packages)", len(scan.Inventory.Packages))
+	writeLine("=========================================================================")
+
+	osInfo, _ := osinfoProvider.GetOSInfo(ctx)
+	convertedPkgs := pkgInfosFromExtractorPackages(ctx, scan, &osInfo)
+
+	for i, rawPkg := range scan.Inventory.Packages {
+		writeLine("\n-------------------------------------------------------------")
+		writeLine("PACKAGE #%d: %s (v%s)", i+1, rawPkg.Name, rawPkg.Version)
+		writeLine("-------------------------------------------------------------")
+		writeLine("[1] RAW SCALIBR METADATA:")
+		writeLine("    - Package Name:  %s", rawPkg.Name)
+		writeLine("    - Version:       %s", rawPkg.Version)
+		writeLine("    - PURL Type:     %s", rawPkg.PURLType)
+		if rawPkg.PURL() != nil {
+			writeLine("    - Raw PURL:      %s", rawPkg.PURL().String())
+		}
+		writeLine("    - Locations:     %v", rawPkg.Locations)
+		writeLine("    - Metadata Type: %T", rawPkg.Metadata)
+		writeLine("    - Metadata Raw:  %+v", rawPkg.Metadata)
+
+		writeLine("\n[2] CONSTRUCTED OSCONFIG PKGINFO:")
+		found := false
+		allConverted := append(append(append(append(convertedPkgs.Deb, convertedPkgs.Rpm...), append(convertedPkgs.COS, convertedPkgs.Chocolatey...)...), convertedPkgs.WinGet...), convertedPkgs.Go...)
+		for _, p := range allConverted {
+			if p.Name == rawPkg.Name || strings.HasSuffix(p.Name, rawPkg.Name) {
+				writeLine("    - Name:          %s", p.Name)
+				writeLine("    - Version:       %s", p.Version)
+				writeLine("    - Type:          %s", p.Type)
+				writeLine("    - Arch:          %s", p.Arch)
+				writeLine("    - PURL:          %s", p.Purl)
+				writeLine("    - Source:        %+v", p.Source)
+				found = true
+				break
+			}
+		}
+		if !found {
+			writeLine("    [UNMAPPED / SKIPPED BY OSCONFIG]")
+		}
+	}
+
+	if _, err := f.WriteString(sb.String()); err != nil {
+		t.Errorf("Failed writing to %s: %v", outputFile, err)
+	} else {
+		t.Logf("\nSuccessfully saved package inspection report to '%s'", outputFile)
+	}
+}
+
+func TestDumpFullInventory(t *testing.T) {
+	ctx := context.Background()
+	osinfoProvider := osinfo.NewProvider()
+
+	var extractors []string
+	if runtime.GOOS == "windows" {
+		extractors = []string{"os/chocolatey", "os/winget", "go/gomod", "go/binary"}
+	} else {
+		extractors = []string{"os/dpkg", "os/rpm", "os/cos", "go/gomod", "go/binary"}
+	}
+
+	provider := &scalibrInstalledPackagesProvider{
+		extractors:     extractors,
+		osinfoProvider: osinfoProvider,
+	}
+
+	t.Log("Collecting installed packages using SCALIBR...")
+	pkgs, err := provider.GetInstalledPackages(ctx)
+	if err != nil {
+		t.Fatalf("Extraction failed: %v", err)
+	}
+
+	outputFile := "inventory_dump.json"
+	data, err := json.MarshalIndent(pkgs, "", "  ")
+	if err != nil {
+		t.Fatalf("JSON marshal error: %v", err)
+	}
+
+	if err := os.WriteFile(outputFile, data, 0644); err != nil {
+		t.Fatalf("Failed writing to %s: %v", outputFile, err)
+	}
+
+	t.Log("\n=========================================================================")
+	t.Log("### Inventory Package Counts by Category")
+	t.Log("=========================================================================")
+	t.Logf("  - Chocolatey: %d packages", len(pkgs.Chocolatey))
+	t.Logf("  - WinGet:     %d packages", len(pkgs.WinGet))
+	t.Logf("  - Go:         %d packages", len(pkgs.Go))
+	t.Logf("  - Debian/Apt: %d packages", len(pkgs.Deb)+len(pkgs.Apt))
+	t.Logf("  - RPM/Yum:    %d packages", len(pkgs.Rpm)+len(pkgs.Yum))
+	t.Logf("  - COS:        %d packages", len(pkgs.COS))
+	t.Logf("\nFull formatted JSON inventory successfully dumped to: %s", outputFile)
 }

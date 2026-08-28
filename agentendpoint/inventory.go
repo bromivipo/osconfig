@@ -172,6 +172,9 @@ func formatPkgsToInventoryItems(ctx context.Context, pkgs *packages.Packages) []
 	if pkgs.WinGet != nil {
 		softwarePackages = append(softwarePackages, genericPkgInfoToInventoryItem(pkgs.WinGet)...)
 	}
+	if pkgs.Go != nil {
+		softwarePackages = append(softwarePackages, genericPkgInfoToInventoryItem(pkgs.Go)...)
+	}
 	if pkgs.Pip != nil {
 		softwarePackages = append(softwarePackages, genericPkgInfoToInventoryItem(pkgs.Pip)...)
 	}
